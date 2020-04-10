@@ -60,7 +60,6 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void startCameraSource() {
-
         //Create the TextRecognizer
         final TextRecognizer textRecognizer = new TextRecognizer.Builder(getApplicationContext()).build();
 
