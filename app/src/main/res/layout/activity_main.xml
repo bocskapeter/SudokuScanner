@@ -7,21 +7,27 @@
     android:orientation="vertical"
     android:weightSum="5"
     tools:context=".MainActivity">
-
     <TextureView
-        android:id="@+id/texture"
+        android:id="@+id/view_finder"
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_above="@+id/btn_take_picture"
-        android:layout_alignParentTop="true"/>
-    <Button
-        android:id="@+id/btn_take_picture"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_alignParentBottom="true"
-        android:layout_centerHorizontal="true"
-        android:layout_marginBottom="16dp"
-        android:layout_marginTop="16dp"
-        android:text="@string/take_picture" />
+        android:layout_height="match_parent"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent" />
+    <SurfaceView
+        android:id="@+id/surface_view"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent" />
+
+    <ImageButton
+        android:id="@+id/imgCapture"
+        android:layout_width="72dp"
+        android:layout_height="72dp"
+        android:layout_margin="24dp"
+        app:srcCompat="@android:drawable/ic_menu_camera"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent" />
 
 </RelativeLayout>
