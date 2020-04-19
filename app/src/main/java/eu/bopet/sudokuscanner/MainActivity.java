@@ -60,9 +60,14 @@ public class MainActivity extends AppCompatActivity {
 
     static {
         ORIENTATIONS.append(Surface.ROTATION_0, 90);
+        ORIENTATIONS.append(Surface.ROTATION_90, 180);
+        ORIENTATIONS.append(Surface.ROTATION_180, 270);
+        ORIENTATIONS.append(Surface.ROTATION_270, 0);
+
+        /*ORIENTATIONS.append(Surface.ROTATION_0, 90);
         ORIENTATIONS.append(Surface.ROTATION_90, 0);
         ORIENTATIONS.append(Surface.ROTATION_180, 270);
-        ORIENTATIONS.append(Surface.ROTATION_270, 180);
+        ORIENTATIONS.append(Surface.ROTATION_270, 180);*/
     }
 
     private static final int REQUEST_CAMERA_PERMISSION = 200;
@@ -292,10 +297,17 @@ public class MainActivity extends AppCompatActivity {
     protected void createCameraPreview() {
         try {
 
-            float ratioCamera = (float) imageDimension.getHeight() / (float) imageDimension.getWidth();
+            float ratioCamera = (float) imageDimension.getWidth() / (float) imageDimension.getHeight();
+            float ratioView = (float) textureView.getWidth() / (float) textureView.getHeight();
+
+            float scale = (float) imageDimension.getHeight() / (float) textureView.getHeight();
+            if (ratioCamera > ratioView) {
+                scale = (float) imageDimension.getWidth() / (float) textureView.getWidth();
+            }
+
             int width = textureView.getWidth();
-            int height = (int) (textureView.getHeight() * ratioCamera);
-            textureView.setLayoutParams(new FrameLayout.LayoutParams(height, width));
+            int height = (int) (textureView.getHeight() * scale);
+            textureView.setLayoutParams(new FrameLayout.LayoutParams(height,width));
 
             SurfaceTexture texture = textureView.getSurfaceTexture();
             assert texture != null;
