@@ -55,7 +55,10 @@ import java.util.Locale;
 public class MainActivity extends AppCompatActivity {
     private static final String TAG = "SudokuScanner";
     private static final int LINE_WIDTH = 2;
+    private static final int LINE_WIDTH_THICK = 8;
     private static final int GRIDS = 9;
+    private static final int MAIN_GRIDS = 3;
+    private static final int MARGIN = 5;
     private static final SparseIntArray ORIENTATIONS = new SparseIntArray();
 
     static {
@@ -63,11 +66,6 @@ public class MainActivity extends AppCompatActivity {
         ORIENTATIONS.append(Surface.ROTATION_90, 0);
         ORIENTATIONS.append(Surface.ROTATION_180, 270);
         ORIENTATIONS.append(Surface.ROTATION_270, 180);
-
-        /*ORIENTATIONS.append(Surface.ROTATION_0, 90);
-        ORIENTATIONS.append(Surface.ROTATION_90, 0);
-        ORIENTATIONS.append(Surface.ROTATION_180, 270);
-        ORIENTATIONS.append(Surface.ROTATION_270, 180);*/
     }
 
     private static final int REQUEST_CAMERA_PERMISSION = 200;
@@ -112,20 +110,34 @@ public class MainActivity extends AppCompatActivity {
                     myPaint.setStrokeWidth(LINE_WIDTH);
                     myPaint.setStyle(Paint.Style.STROKE);
 
+                    Paint thickPaint = new Paint();
+                    thickPaint.setColor(Color.rgb(30, 10, 50));
+                    thickPaint.setStrokeWidth(LINE_WIDTH_THICK);
+                    thickPaint.setStyle(Paint.Style.STROKE);
+
                     int sideLength;
                     if (surfaceView.getWidth() > surfaceView.getHeight()) {
                         sideLength = surfaceView.getHeight();
                     } else {
                         sideLength = surfaceView.getWidth();
                     }
-                    int square = sideLength / GRIDS;
-                    int margin = (sideLength - (square * GRIDS)) / 2;
+                    int square = (sideLength - (2 * MARGIN)) / GRIDS;
+                    int margin = ((sideLength - (square * GRIDS)) / 2);
+
+                    int mainSquare = square * (GRIDS / MAIN_GRIDS);
 
                     for (int i = 0; i < GRIDS; i++) {
                         for (int j = 0; j < GRIDS; j++) {
                             canvas.drawRect(margin + i * square, margin + j * square, margin + i * square + square, margin + j * square + square, myPaint);
                         }
                     }
+
+                    for (int i = 0; i < MAIN_GRIDS; i++) {
+                        for (int j = 0; j < MAIN_GRIDS; j++) {
+                            canvas.drawRect(margin + i * mainSquare, margin + j * mainSquare, margin + i * mainSquare + mainSquare, margin + j * mainSquare + mainSquare, thickPaint);
+                        }
+                    }
+
                     holder.unlockCanvasAndPost(canvas);
                 }
             }
@@ -225,13 +237,15 @@ public class MainActivity extends AppCompatActivity {
             if (characteristics != null) {
                 jpegSizes = characteristics.get(CameraCharacteristics.SCALER_STREAM_CONFIGURATION_MAP).getOutputSizes(ImageFormat.JPEG);
             }
-            int width = 640;
-            int height = 480;
+            Size usedSize = new Size(640, 480);
             if (jpegSizes != null && 0 < jpegSizes.length) {
-                width = jpegSizes[jpegSizes.length - 1].getWidth();
-                height = jpegSizes[jpegSizes.length - 1].getHeight();
+                for (Size s : jpegSizes) {
+                    if (s.getWidth() > usedSize.getWidth() || s.getHeight() > s.getHeight()) {
+                        usedSize = s;
+                    }
+                }
             }
-            ImageReader reader = ImageReader.newInstance(width, height, ImageFormat.JPEG, 1);
+            ImageReader reader = ImageReader.newInstance(usedSize.getWidth(), usedSize.getHeight(), ImageFormat.JPEG, 1);
             List<Surface> outputSurfaces = new ArrayList<>(2);
             outputSurfaces.add(reader.getSurface());
             outputSurfaces.add(new Surface(textureView.getSurfaceTexture()));
@@ -296,36 +310,6 @@ public class MainActivity extends AppCompatActivity {
 
     protected void createCameraPreview() {
         try {
-
-            Log.e(TAG,"Before: ");
-            Log.e(TAG,"Image size: " + imageDimension.getWidth() +" x " + imageDimension.getHeight());
-            Log.e(TAG, "View size: " + textureView.getWidth() +" x " + textureView.getHeight());
-
-            float ratioCamera = (float) imageDimension.getWidth() / (float) imageDimension.getHeight();
-            float ratioView = (float) textureView.getWidth() / (float) textureView.getHeight();
-
-            int width;
-            int height;
-
-            float scale;
-            if (ratioCamera > ratioView) {
-                scale = (float) imageDimension.getWidth() / (float) textureView.getWidth();
-                width = (int) (textureView.getWidth() * scale);
-                height = textureView.getHeight();
-            }else {
-                scale = (float) imageDimension.getHeight() / (float) textureView.getHeight();
-                width = textureView.getWidth();
-                height = (int) (textureView.getHeight() * scale);
-            }
-
-            Log.e(TAG,"Set to size: " + width +" x " + height);
-
-            textureView.setLayoutParams(new FrameLayout.LayoutParams(width,height));
-
-            Log.e(TAG,"After: ");
-            Log.e(TAG,"Image size: " + imageDimension.getWidth() +" x " + imageDimension.getHeight());
-            Log.e(TAG, "View size: " + textureView.getWidth() +" x " + textureView.getHeight());
-
             SurfaceTexture texture = textureView.getSurfaceTexture();
             assert texture != null;
             texture.setDefaultBufferSize(imageDimension.getWidth(), imageDimension.getHeight());
@@ -374,6 +358,31 @@ public class MainActivity extends AppCompatActivity {
                 }
             }
             Log.e(TAG, "size: " + imageDimension.getWidth() + " x " + imageDimension.getHeight());
+
+
+            float ratioCamera = (float) imageDimension.getWidth() / (float) imageDimension.getHeight();
+
+            Log.e(TAG, "Before: ");
+            Log.e(TAG, "Image size: " + imageDimension.getWidth() + " x " + imageDimension.getHeight() + " ratio: " + ratioCamera);
+            Log.e(TAG, "View size: " + textureView.getWidth() + " x " + textureView.getHeight());
+
+            int width;
+            int height;
+
+            float scaleX = (float) imageDimension.getHeight() / (float) textureView.getWidth();
+
+            width = textureView.getWidth();
+            height = (int) (imageDimension.getWidth() / scaleX);
+
+            Log.e(TAG, "Set to size: " + width + " x " + height);
+
+            textureView.setLayoutParams(new FrameLayout.LayoutParams(width, height));
+
+
+            Log.e(TAG, "After: ");
+            Log.e(TAG, "Image size: " + imageDimension.getWidth() + " x " + imageDimension.getHeight());
+            Log.e(TAG, "View size: " + textureView.getLayoutParams().width + " x " + textureView.getLayoutParams().height);
+
 
             // Add permission for camera and let user grant the permission
             if (ActivityCompat.checkSelfPermission(this, Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED && ActivityCompat.checkSelfPermission(this, Manifest.permission.WRITE_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED) {
