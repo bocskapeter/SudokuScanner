@@ -60,9 +60,9 @@ public class MainActivity extends AppCompatActivity {
 
     static {
         ORIENTATIONS.append(Surface.ROTATION_0, 90);
-        ORIENTATIONS.append(Surface.ROTATION_90, 180);
+        ORIENTATIONS.append(Surface.ROTATION_90, 0);
         ORIENTATIONS.append(Surface.ROTATION_180, 270);
-        ORIENTATIONS.append(Surface.ROTATION_270, 0);
+        ORIENTATIONS.append(Surface.ROTATION_270, 180);
 
         /*ORIENTATIONS.append(Surface.ROTATION_0, 90);
         ORIENTATIONS.append(Surface.ROTATION_90, 0);
@@ -297,17 +297,34 @@ public class MainActivity extends AppCompatActivity {
     protected void createCameraPreview() {
         try {
 
+            Log.e(TAG,"Before: ");
+            Log.e(TAG,"Image size: " + imageDimension.getWidth() +" x " + imageDimension.getHeight());
+            Log.e(TAG, "View size: " + textureView.getWidth() +" x " + textureView.getHeight());
+
             float ratioCamera = (float) imageDimension.getWidth() / (float) imageDimension.getHeight();
             float ratioView = (float) textureView.getWidth() / (float) textureView.getHeight();
 
-            float scale = (float) imageDimension.getHeight() / (float) textureView.getHeight();
+            int width;
+            int height;
+
+            float scale;
             if (ratioCamera > ratioView) {
                 scale = (float) imageDimension.getWidth() / (float) textureView.getWidth();
+                width = (int) (textureView.getWidth() * scale);
+                height = textureView.getHeight();
+            }else {
+                scale = (float) imageDimension.getHeight() / (float) textureView.getHeight();
+                width = textureView.getWidth();
+                height = (int) (textureView.getHeight() * scale);
             }
 
-            int width = textureView.getWidth();
-            int height = (int) (textureView.getHeight() * scale);
-            textureView.setLayoutParams(new FrameLayout.LayoutParams(height,width));
+            Log.e(TAG,"Set to size: " + width +" x " + height);
+
+            textureView.setLayoutParams(new FrameLayout.LayoutParams(width,height));
+
+            Log.e(TAG,"After: ");
+            Log.e(TAG,"Image size: " + imageDimension.getWidth() +" x " + imageDimension.getHeight());
+            Log.e(TAG, "View size: " + textureView.getWidth() +" x " + textureView.getHeight());
 
             SurfaceTexture texture = textureView.getSurfaceTexture();
             assert texture != null;
