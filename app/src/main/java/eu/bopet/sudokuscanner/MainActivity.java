@@ -124,17 +124,8 @@ public class MainActivity extends AppCompatActivity {
 
                     int mainSquare = square * (GRIDS / MAIN_GRIDS);
 
-                    for (int i = 0; i < GRIDS; i++) {
-                        for (int j = 0; j < GRIDS; j++) {
-                            canvas.drawRect(margin + i * square, margin + j * square, margin + i * square + square, margin + j * square + square, myPaint);
-                        }
-                    }
-
-                    for (int i = 0; i < MAIN_GRIDS; i++) {
-                        for (int j = 0; j < MAIN_GRIDS; j++) {
-                            canvas.drawRect(margin + i * mainSquare, margin + j * mainSquare, margin + i * mainSquare + mainSquare, margin + j * mainSquare + mainSquare, thickPaint);
-                        }
-                    }
+                    drawGrids(GRIDS,canvas,margin,square,myPaint);
+                    drawGrids(MAIN_GRIDS,canvas,margin,mainSquare,thickPaint);
 
                     holder.unlockCanvasAndPost(canvas);
                 }
@@ -151,6 +142,14 @@ public class MainActivity extends AppCompatActivity {
             }
         });
 
+    }
+
+    private void drawGrids(int grids, Canvas canvas, int margin, int square, Paint myPaint) {
+        for (int i = 0; i < grids; i++) {
+            for (int j = 0; j < grids; j++) {
+                canvas.drawRect(margin + i * square, margin + j * square, margin + i * square + square, margin + j * square + square, myPaint);
+            }
+        }
     }
 
     private final TextureView.SurfaceTextureListener textureListener = new TextureView.SurfaceTextureListener() {
