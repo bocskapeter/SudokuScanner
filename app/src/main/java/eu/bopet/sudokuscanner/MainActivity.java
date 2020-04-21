@@ -73,9 +73,9 @@ public class MainActivity extends AppCompatActivity {
 
     private TextureView textureView;
     private SurfaceView surfaceView;
-    protected CameraDevice cameraDevice;
-    protected CameraCaptureSession cameraCaptureSessions;
-    protected CaptureRequest.Builder captureRequestBuilder;
+    private CameraDevice cameraDevice;
+    private CameraCaptureSession cameraCaptureSessions;
+    private CaptureRequest.Builder captureRequestBuilder;
     private Size imageDimension;
     private ImageReader imageReader;
     private File file;
@@ -153,7 +153,7 @@ public class MainActivity extends AppCompatActivity {
 
     }
 
-    TextureView.SurfaceTextureListener textureListener = new TextureView.SurfaceTextureListener() {
+    private final TextureView.SurfaceTextureListener textureListener = new TextureView.SurfaceTextureListener() {
         @Override
         public void onSurfaceTextureAvailable(SurfaceTexture surface, int width, int height) {
             //open your camera here
@@ -197,13 +197,13 @@ public class MainActivity extends AppCompatActivity {
         }
     };
 
-    protected void startBackgroundThread() {
+    private void startBackgroundThread() {
         mBackgroundThread = new HandlerThread("Camera Background");
         mBackgroundThread.start();
         mBackgroundHandler = new Handler(mBackgroundThread.getLooper());
     }
 
-    protected void stopBackgroundThread() {
+    private void stopBackgroundThread() {
         mBackgroundThread.quitSafely();
         try {
             mBackgroundThread.join();
@@ -214,7 +214,7 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
-    protected void takePicture() {
+    private void takePicture() {
         if (null == cameraDevice) {
             Log.e(TAG, "cameraDevice is null");
             return;
@@ -294,7 +294,7 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
-    protected void createCameraPreview() {
+    private void createCameraPreview() {
         try {
             SurfaceTexture texture = textureView.getSurfaceTexture();
             assert texture != null;
@@ -382,7 +382,7 @@ public class MainActivity extends AppCompatActivity {
         Log.e(TAG, "openCamera X");
     }
 
-    protected void updatePreview() {
+    private void updatePreview() {
         if (null == cameraDevice) {
             Log.e(TAG, "updatePreview error, return");
         }
