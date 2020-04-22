@@ -269,10 +269,12 @@ public class MainActivity extends AppCompatActivity {
                         ByteBuffer buffer = image.getPlanes()[0].getBuffer();
                         byte[] bytes = new byte[buffer.capacity()];
                         buffer.get(bytes);
-                        Bitmap bitmapImage = BitmapFactory.decodeByteArray(bytes, 0, bytes.length, null);
-                        Bitmap[][] squareBitmaps = splitBitmap(bitmapImage);
-                        int[][] numbers = getNumbersFromBitmaps(squareBitmaps);
-                        drawNumbers(numbers);
+                        new Thread(() -> {
+                            Bitmap bitmapImage = BitmapFactory.decodeByteArray(bytes, 0, bytes.length, null);
+                            Bitmap[][] squareBitmaps = splitBitmap(bitmapImage);
+                            int[][] numbers = getNumbersFromBitmaps(squareBitmaps);
+                            drawNumbers(numbers);
+                        }).start();
                         save(bytes);
                     } catch (IOException e) {
                         e.printStackTrace();
@@ -329,13 +331,10 @@ public class MainActivity extends AppCompatActivity {
 
     private int[][] getNumbersFromBitmaps(Bitmap[][] bitmaps) {
         int[][] result = new int[bitmaps.length][bitmaps.length];
-
         TextRecognizer textRecognizer = new TextRecognizer.Builder(this).build();
-
         if (!textRecognizer.isOperational()) {
             Log.w(TAG, "Detector dependencies are not yet available.");
         }
-
         for (int i = 0; i < bitmaps.length; i++){
             for (int j = 0; j< bitmaps.length; j++){
                 Frame imageFrame = new Frame.Builder()
@@ -351,13 +350,11 @@ public class MainActivity extends AppCompatActivity {
                 }
             }
         }
-
-
         return result;
     }
 
     private Bitmap[][] splitBitmap(Bitmap bitmapImage) {
-        float sqr = (float) bitmapImage.getHeight() / (float) GRIDS;
+        float sqr = ((float) bitmapImage.getHeight() / (float) GRIDS)-1;
         Bitmap[][] bitmaps = new Bitmap[GRIDS][GRIDS];
         for (int x = 0; x < GRIDS; ++x) {
             for (int y = 0; y < GRIDS; ++y) {
