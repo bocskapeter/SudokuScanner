@@ -3,6 +3,8 @@ package eu.bopet.sudokuscanner;
 import android.Manifest;
 import android.content.Context;
 import android.content.pm.PackageManager;
+import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
 import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.ImageFormat;
@@ -26,6 +28,7 @@ import android.os.Handler;
 import android.os.HandlerThread;
 import android.util.Log;
 import android.util.Size;
+import android.util.SparseArray;
 import android.util.SparseIntArray;
 import android.view.Surface;
 import android.view.SurfaceHolder;
@@ -39,6 +42,10 @@ import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
 
+import com.google.android.gms.vision.Frame;
+import com.google.android.gms.vision.text.TextBlock;
+import com.google.android.gms.vision.text.TextRecognizer;
+
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
@@ -46,6 +53,7 @@ import java.io.OutputStream;
 import java.nio.ByteBuffer;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.Date;
 import java.util.List;
@@ -60,6 +68,7 @@ public class MainActivity extends AppCompatActivity {
     private static final int GRIDS = 9;
     private static final int MAIN_GRIDS = 3;
     private static final int MARGIN = 5;
+    private static final List<String> VALUES = Arrays.asList(new String[]{"1", "2", "3", "4", "5", "6", "7", "8", "9"});
     private static final SparseIntArray ORIENTATIONS = new SparseIntArray();
 
     static {
@@ -81,6 +90,10 @@ public class MainActivity extends AppCompatActivity {
     private File file;
     private Handler mBackgroundHandler;
     private HandlerThread mBackgroundThread;
+    private int square;
+    private int margin;
+    private SurfaceHolder holder;
+    private Canvas canvas;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -92,14 +105,17 @@ public class MainActivity extends AppCompatActivity {
         ImageButton takePictureButton = findViewById(R.id.imgCapture);
         takePictureButton.setOnClickListener(v -> takePicture());
 
+        final TextRecognizer textRecognizer = new TextRecognizer.Builder(getApplicationContext()).build();
+
         surfaceView = findViewById(R.id.surface_view);
         surfaceView.setZOrderOnTop(true);
         SurfaceHolder mHolder = surfaceView.getHolder();
         mHolder.setFormat(PixelFormat.TRANSPARENT);
         mHolder.addCallback(new SurfaceHolder.Callback() {
             @Override
-            public void surfaceCreated(SurfaceHolder holder) {
-                Canvas canvas = holder.lockCanvas();
+            public void surfaceCreated(SurfaceHolder surfaceHolder) {
+                holder = surfaceHolder;
+                canvas = surfaceHolder.lockCanvas();
                 if (canvas == null) {
                     Log.e(TAG, "Cannot draw onto the canvas as it's null");
                 } else {
@@ -119,15 +135,15 @@ public class MainActivity extends AppCompatActivity {
                     } else {
                         sideLength = surfaceView.getWidth();
                     }
-                    int square = (sideLength - (2 * MARGIN)) / GRIDS;
-                    int margin = ((sideLength - (square * GRIDS)) / 2);
+                    square = (sideLength - (2 * MARGIN)) / GRIDS;
+                    margin = ((sideLength - (square * GRIDS)) / 2);
 
                     int mainSquare = square * (GRIDS / MAIN_GRIDS);
 
-                    drawGrids(GRIDS,canvas,margin,square,myPaint);
-                    drawGrids(MAIN_GRIDS,canvas,margin,mainSquare,thickPaint);
+                    drawGrids(GRIDS, canvas, margin, square, myPaint);
+                    drawGrids(MAIN_GRIDS, canvas, margin, mainSquare, thickPaint);
 
-                    holder.unlockCanvasAndPost(canvas);
+                    surfaceHolder.unlockCanvasAndPost(canvas);
                 }
             }
 
@@ -253,6 +269,10 @@ public class MainActivity extends AppCompatActivity {
                         ByteBuffer buffer = image.getPlanes()[0].getBuffer();
                         byte[] bytes = new byte[buffer.capacity()];
                         buffer.get(bytes);
+                        Bitmap bitmapImage = BitmapFactory.decodeByteArray(bytes, 0, bytes.length, null);
+                        Bitmap[][] squareBitmaps = splitBitmap(bitmapImage);
+                        int[][] numbers = getNumbersFromBitmaps(squareBitmaps);
+                        drawNumbers(numbers);
                         save(bytes);
                     } catch (IOException e) {
                         e.printStackTrace();
@@ -291,6 +311,60 @@ public class MainActivity extends AppCompatActivity {
         } catch (CameraAccessException e) {
             e.printStackTrace();
         }
+    }
+
+    private void drawNumbers(int[][] numbers) {
+        canvas = holder.lockCanvas();
+        for (int i = 0; i < numbers.length; i++) {
+            for (int j = 0; j < numbers.length; j++) {
+                Paint myPaint = new Paint();
+                myPaint.setColor(Color.rgb(150, 20, 100));
+                myPaint.setTextSize(square / 2);
+                myPaint.setTextAlign(Paint.Align.CENTER);
+                canvas.drawText(String.valueOf(numbers[i][j]), margin + i * square + square / 2, margin + j * square + square / 2, myPaint);
+            }
+        }
+        holder.unlockCanvasAndPost(canvas);
+    }
+
+    private int[][] getNumbersFromBitmaps(Bitmap[][] bitmaps) {
+        int[][] result = new int[bitmaps.length][bitmaps.length];
+
+        TextRecognizer textRecognizer = new TextRecognizer.Builder(this).build();
+
+        if (!textRecognizer.isOperational()) {
+            Log.w(TAG, "Detector dependencies are not yet available.");
+        }
+
+        for (int i = 0; i < bitmaps.length; i++){
+            for (int j = 0; j< bitmaps.length; j++){
+                Frame imageFrame = new Frame.Builder()
+                        .setBitmap(bitmaps[i][j])
+                        .build();
+                SparseArray<TextBlock> textBlocks = textRecognizer.detect(imageFrame);
+                for (int k = 0; k < textBlocks.size(); k++) {
+                    TextBlock textBlock = textBlocks.get(textBlocks.keyAt(k));
+                    String text = textBlock.getValue();
+                    if (text.length()==1 && VALUES.contains(text)){
+                        result[i][j] = Integer.parseInt(text);
+                    }
+                }
+            }
+        }
+
+
+        return result;
+    }
+
+    private Bitmap[][] splitBitmap(Bitmap bitmapImage) {
+        float sqr = (float) bitmapImage.getHeight() / (float) GRIDS;
+        Bitmap[][] bitmaps = new Bitmap[GRIDS][GRIDS];
+        for (int x = 0; x < GRIDS; ++x) {
+            for (int y = 0; y < GRIDS; ++y) {
+                bitmaps[x][y] = Bitmap.createBitmap(bitmapImage, (int) (x * sqr), (int) (y * sqr), (int) sqr, (int) sqr);
+            }
+        }
+        return bitmaps;
     }
 
     private void createCameraPreview() {
