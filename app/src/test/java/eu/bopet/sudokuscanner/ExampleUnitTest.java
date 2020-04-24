@@ -28,8 +28,9 @@ public class ExampleUnitTest {
         for (int i = 0; i<solution.length;i++){
             for (int j = 0; j<solution.length;j++){
                 System.out.print(solution[i][j] + ", ");
+                assert solution[i][j]!=0;
             }
-            System.out.println(" ");
+            System.out.println("");
         }
     }
 }
