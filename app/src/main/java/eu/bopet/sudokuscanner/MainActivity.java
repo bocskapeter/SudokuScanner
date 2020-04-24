@@ -7,6 +7,8 @@ import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.graphics.Canvas;
 import android.graphics.Color;
+import android.graphics.ColorMatrix;
+import android.graphics.ColorMatrixColorFilter;
 import android.graphics.ImageFormat;
 import android.graphics.Paint;
 import android.graphics.PixelFormat;
@@ -58,7 +60,6 @@ import java.util.Collections;
 import java.util.Date;
 import java.util.List;
 import java.util.Locale;
-import java.util.Objects;
 
 
 public class MainActivity extends AppCompatActivity {
@@ -68,7 +69,7 @@ public class MainActivity extends AppCompatActivity {
     private static final int GRIDS = 9;
     private static final int MAIN_GRIDS = 3;
     private static final int MARGIN = 5;
-    private static final List<String> VALUES = Arrays.asList(new String[]{"1", "2", "3", "4", "5", "6", "7", "8", "9"});
+    private static final List<String> VALUES = Arrays.asList("1", "2", "3", "4", "5", "6", "7", "8", "9");
     private static final SparseIntArray ORIENTATIONS = new SparseIntArray();
 
     static {
@@ -104,8 +105,6 @@ public class MainActivity extends AppCompatActivity {
         textureView.setSurfaceTextureListener(textureListener);
         ImageButton takePictureButton = findViewById(R.id.imgCapture);
         takePictureButton.setOnClickListener(v -> takePicture());
-
-        final TextRecognizer textRecognizer = new TextRecognizer.Builder(getApplicationContext()).build();
 
         surfaceView = findViewById(R.id.surface_view);
         surfaceView.setZOrderOnTop(true);
@@ -234,19 +233,8 @@ public class MainActivity extends AppCompatActivity {
             Log.e(TAG, "cameraDevice is null");
             return;
         }
-        CameraManager manager = (CameraManager) getSystemService(Context.CAMERA_SERVICE);
         try {
-            CameraCharacteristics characteristics = manager.getCameraCharacteristics(cameraDevice.getId());
-            Size[] jpegSizes = Objects.requireNonNull(characteristics.get(CameraCharacteristics.SCALER_STREAM_CONFIGURATION_MAP)).getOutputSizes(ImageFormat.JPEG);
-            Size usedSize = new Size(640, 480);
-            if (jpegSizes != null && 0 < jpegSizes.length) {
-                for (Size s : jpegSizes) {
-                    if (s.getWidth() > usedSize.getWidth() || s.getHeight() > s.getHeight()) {
-                        usedSize = s;
-                    }
-                }
-            }
-            ImageReader reader = ImageReader.newInstance(usedSize.getWidth(), usedSize.getHeight(), ImageFormat.JPEG, 1);
+            ImageReader reader = ImageReader.newInstance(imageDimension.getWidth(), imageDimension.getHeight(), ImageFormat.JPEG, 1);
             List<Surface> outputSurfaces = new ArrayList<>(2);
             outputSurfaces.add(reader.getSurface());
             outputSurfaces.add(new Surface(textureView.getSurfaceTexture()));
@@ -258,10 +246,8 @@ public class MainActivity extends AppCompatActivity {
             int rotation = getWindowManager().getDefaultDisplay().getRotation();
             captureBuilder.set(CaptureRequest.JPEG_ORIENTATION, ORIENTATIONS.get(rotation));
 
+            file = new File(Environment.getExternalStorageDirectory() + "/" + getDate() + ".jpg");
 
-            SimpleDateFormat format = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS", Locale.getDefault());
-            String date = format.format(new Date());
-            file = new File(Environment.getExternalStorageDirectory() + "/" + date + ".jpg");
             ImageReader.OnImageAvailableListener readerListener = new ImageReader.OnImageAvailableListener() {
                 @Override
                 public void onImageAvailable(ImageReader reader) {
@@ -270,10 +256,22 @@ public class MainActivity extends AppCompatActivity {
                         byte[] bytes = new byte[buffer.capacity()];
                         buffer.get(bytes);
                         new Thread(() -> {
+                            Log.e(TAG, "thread started...");
                             Bitmap bitmapImage = BitmapFactory.decodeByteArray(bytes, 0, bytes.length, null);
+                            Log.e(TAG, "scale bitmap... " + bitmapImage.getWidth() + "x" + bitmapImage.getHeight());
+                            float ratio = (float) bitmapImage.getWidth() / (float) bitmapImage.getHeight();
+                            int width = 640;
+                            int height = (int) (width / ratio);
+                            bitmapImage = Bitmap.createScaledBitmap(bitmapImage, width, height, true);
+                            Log.e(TAG, "convert to grayscale... " + bitmapImage.getWidth() + "x" + bitmapImage.getHeight());
+                            bitmapImage = toGrayscale(bitmapImage);
+                            Log.e(TAG, "split bitmap... " + bitmapImage.getWidth() + "x" + bitmapImage.getHeight());
                             Bitmap[][] squareBitmaps = splitBitmap(bitmapImage);
+                            Log.e(TAG, "get numbers...");
                             int[][] numbers = getNumbersFromBitmaps(squareBitmaps);
-                            drawNumbers(numbers);
+                            int[][] solution = solveSudoku(numbers);
+                            Log.e(TAG, "draw numbers...");
+                            drawNumbers(solution);
                         }).start();
                         save(bytes);
                     } catch (IOException e) {
@@ -315,15 +313,106 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
+    private int[][] solveSudoku(int[][] numbers) {
+        int[][] solution = new int[numbers.length][numbers.length];
+        for (int i = 0; i < numbers.length; i++) {
+            for (int j = 0; j < numbers.length; j++) {
+                solution[i][j] = numbers[i][j];
+            }
+        }
+        int nol = 0;
+        int oldNol = numbers.length * numbers.length;
+        boolean converged = true;
+        List<Integer>[][] pn = new ArrayList[solution.length][solution.length];
+        int bx, by;
+
+        for (int i = 0; i < solution.length; i++) {
+            for (int j = 0; j < solution.length; j++) {
+                if (solution[i][j] == 0) {
+                    pn[i][j] = new ArrayList<>();
+                    for (int k = 1; k < solution.length + 1; k++) {
+                        pn[i][j].add(k);
+                    }
+                }
+            }
+        }
+        while (converged) {
+            for (int i = 0; i < solution.length; i++) {
+                for (int j = 0; j < solution.length; j++) {
+                    if (solution[i][j] == 0) {
+                        //check column
+                        for (int k = 0; k < solution.length; k++) {
+                            if (solution[i][k] > 0 && pn[i][j].contains(solution[i][k])) {
+                                pn[i][j].remove((Integer) solution[i][k]);
+                            }
+                        }
+                        //check row
+                        for (int k = 0; k < solution.length; k++) {
+                            if (solution[k][j] > 0 && pn[i][j].contains(solution[k][j])) {
+                                pn[i][j].remove((Integer) solution[k][j]);
+                            }
+                        }
+                        //check block
+                        for (int k = 0; k < MAIN_GRIDS; k++) {
+                            for (int l = 0; l < MAIN_GRIDS; l++) {
+                                bx = (i / MAIN_GRIDS + k);
+                                by = (j / MAIN_GRIDS + l);
+                                if (solution[i][j] > 0 && pn[bx][by].contains(solution[i][j])) {
+                                    pn[bx][by].remove((Integer) solution[i][j]);
+                                }
+                            }
+                        }
+                        if (pn[i][j].size() == 1) {
+                            solution[i][j] = pn[i][j].get(0);
+                            pn[i][j] = null;
+                        } else {
+                            nol++;
+                        }
+                    }
+                }
+            }
+            if (oldNol > nol) {
+                converged = true;
+                oldNol = nol;
+                nol = 0;
+            } else {
+                converged = false;
+            }
+        }
+        return solution;
+    }
+
+    private String getDate() {
+        SimpleDateFormat format = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS", Locale.getDefault());
+        return format.format(new Date());
+    }
+
+    private Bitmap toGrayscale(Bitmap bmpOriginal) {
+        int width, height;
+        height = bmpOriginal.getHeight();
+        width = bmpOriginal.getWidth();
+        Bitmap bmpGrayscale = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888);
+        Canvas c = new Canvas(bmpGrayscale);
+        Paint paint = new Paint();
+        ColorMatrix cm = new ColorMatrix();
+        cm.setSaturation(0);
+        ColorMatrixColorFilter f = new ColorMatrixColorFilter(cm);
+        paint.setColorFilter(f);
+        c.drawBitmap(bmpOriginal, 0, 0, paint);
+        return bmpGrayscale;
+    }
+
     private void drawNumbers(int[][] numbers) {
         canvas = holder.lockCanvas();
         for (int i = 0; i < numbers.length; i++) {
             for (int j = 0; j < numbers.length; j++) {
+                if (numbers[i][j]==0) continue;
                 Paint myPaint = new Paint();
                 myPaint.setColor(Color.rgb(150, 20, 100));
-                myPaint.setTextSize(square / 2);
+                int hSqr = square / 2;
+                myPaint.setTextSize(hSqr);
                 myPaint.setTextAlign(Paint.Align.CENTER);
-                canvas.drawText(String.valueOf(numbers[i][j]), margin + i * square + square / 2, margin + j * square + square / 2, myPaint);
+                canvas.drawText(String.valueOf(numbers[i][j]), margin + i * square + hSqr, margin + j * square + hSqr, myPaint);
             }
         }
         holder.unlockCanvasAndPost(canvas);
@@ -331,20 +420,27 @@ public class MainActivity extends AppCompatActivity {
 
     private int[][] getNumbersFromBitmaps(Bitmap[][] bitmaps) {
         int[][] result = new int[bitmaps.length][bitmaps.length];
+        Log.e(TAG, "Create Recogniser: ");
         TextRecognizer textRecognizer = new TextRecognizer.Builder(this).build();
         if (!textRecognizer.isOperational()) {
-            Log.w(TAG, "Detector dependencies are not yet available.");
+            Log.e(TAG, "Detector dependencies are not yet available.");
         }
-        for (int i = 0; i < bitmaps.length; i++){
-            for (int j = 0; j< bitmaps.length; j++){
-                Frame imageFrame = new Frame.Builder()
+        Frame[][] frames = new Frame[bitmaps.length][bitmaps.length];
+        for (int i = 0; i < bitmaps.length; i++) {
+            for (int j = 0; j < bitmaps.length; j++) {
+                frames[i][j] = new Frame.Builder()
                         .setBitmap(bitmaps[i][j])
                         .build();
-                SparseArray<TextBlock> textBlocks = textRecognizer.detect(imageFrame);
-                for (int k = 0; k < textBlocks.size(); k++) {
-                    TextBlock textBlock = textBlocks.get(textBlocks.keyAt(k));
-                    String text = textBlock.getValue();
-                    if (text.length()==1 && VALUES.contains(text)){
+            }
+        }
+        SparseArray<TextBlock>[][] blocks = new SparseArray[bitmaps.length][bitmaps.length];
+        Log.e(TAG, "Iterate images: ");
+        for (int i = 0; i < bitmaps.length; i++) {
+            for (int j = 0; j < bitmaps.length; j++) {
+                blocks[i][j] = textRecognizer.detect(frames[i][j]);
+                if (blocks[i][j].size() == 1) {
+                    String text = blocks[i][j].get(0).getValue();
+                    if (text.length() == 1 && VALUES.contains(text)) {
                         result[i][j] = Integer.parseInt(text);
                     }
                 }
@@ -354,11 +450,17 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private Bitmap[][] splitBitmap(Bitmap bitmapImage) {
-        float sqr = ((float) bitmapImage.getHeight() / (float) GRIDS)-1;
+        int sqr;
+        if (bitmapImage.getWidth() > bitmapImage.getHeight()) {
+            sqr = (int) ((float) bitmapImage.getHeight() / (float) GRIDS);
+        } else {
+            sqr = (int) ((float) bitmapImage.getWidth() / (float) GRIDS);
+        }
+        Log.e(TAG, "split image of: " + bitmapImage.getWidth() + "x" + bitmapImage.getHeight() + " to squares: " + sqr);
         Bitmap[][] bitmaps = new Bitmap[GRIDS][GRIDS];
         for (int x = 0; x < GRIDS; ++x) {
             for (int y = 0; y < GRIDS; ++y) {
-                bitmaps[x][y] = Bitmap.createBitmap(bitmapImage, (int) (x * sqr), (int) (y * sqr), (int) sqr, (int) sqr);
+                bitmaps[x][y] = Bitmap.createBitmap(bitmapImage, x * sqr, y * sqr, sqr, sqr);
             }
         }
         return bitmaps;
@@ -399,26 +501,24 @@ public class MainActivity extends AppCompatActivity {
         CameraManager manager = (CameraManager) getSystemService(Context.CAMERA_SERVICE);
         Log.e(TAG, "is camera open");
         try {
+            assert manager != null;
             String cameraId = manager.getCameraIdList()[0];
             CameraCharacteristics characteristics = manager.getCameraCharacteristics(cameraId);
 
             StreamConfigurationMap map = characteristics.get(CameraCharacteristics.SCALER_STREAM_CONFIGURATION_MAP);
             assert map != null;
             Size[] availableSizes = map.getOutputSizes(SurfaceTexture.class);
+            Log.e(TAG, "Supported image sizes: ");
+            imageDimension = availableSizes[0];
             for (Size s : availableSizes) {
-                if (imageDimension == null) {
+                if (s.getWidth() == 1280) {
                     imageDimension = s;
                 }
-                if (imageDimension.getWidth() <= s.getWidth() && imageDimension.getHeight() <= s.getHeight()) {
-                    imageDimension = s;
-                }
+                Log.e(TAG, " --> " + s.getWidth() + " x " + s.getHeight());
             }
-            Log.e(TAG, "size: " + imageDimension.getWidth() + " x " + imageDimension.getHeight());
-
 
             float ratioCamera = (float) imageDimension.getWidth() / (float) imageDimension.getHeight();
 
-            Log.e(TAG, "Before: ");
             Log.e(TAG, "Image size: " + imageDimension.getWidth() + " x " + imageDimension.getHeight() + " ratio: " + ratioCamera);
             Log.e(TAG, "View size: " + textureView.getWidth() + " x " + textureView.getHeight());
 
