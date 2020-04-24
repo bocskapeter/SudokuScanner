@@ -5,6 +5,7 @@ import java.util.List;
 
 public class Solver {
 
+
     public static int[][] solve(int[][] numbers, int size) {
         int[][] solution = new int[numbers.length][numbers.length];
         for (int i = 0; i < numbers.length; i++) {
